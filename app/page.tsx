@@ -5,6 +5,7 @@ import { ControlPanel } from '@/components/ControlPanel';
 import { useWaypoints } from '@/hooks/useWaypoints';
 import { useRoute } from '@/hooks/useRoute';
 import { useCostSettings } from '@/hooks/useCostSettings';
+import { reverseGeocode } from '@/lib/geocoding';
 
 export default function Home() {
   const {
@@ -17,8 +18,20 @@ export default function Home() {
   const { route, loading } = useRoute(waypoints);
   const { settings, updateMpg, updatePrice } = useCostSettings();
 
-  const handleUpdateWaypoint = (id: string, lat: number, lng: number) => {
-    updateWaypoint(id, { lat, lng });
+  const handleUpdateWaypoint = async (id: string, lat: number, lng: number) => {
+    // Update position immediately
+    updateWaypoint(id, { lat, lng, name: '...' });
+
+    // Fetch new location name
+    try {
+      const locationName = await reverseGeocode(lng, lat);
+      updateWaypoint(id, { name: locationName });
+    } catch (error) {
+      console.error('Failed to geocode location:', error);
+      updateWaypoint(id, {
+        name: `Location at ${lat.toFixed(2)}, ${lng.toFixed(2)}`,
+      });
+    }
   };
 
   const handleUpdateWaypointName = (id: string, name: string) => {

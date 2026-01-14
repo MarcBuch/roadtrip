@@ -2,18 +2,40 @@
 
 import { useState, useCallback } from 'react';
 import { Waypoint } from '@/types/travel';
+import { reverseGeocode } from '@/lib/geocoding';
 
 export function useWaypoints() {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
 
-  const addWaypoint = useCallback((lng: number, lat: number) => {
+  const addWaypoint = useCallback(async (lng: number, lat: number) => {
+    const id = `waypoint-${Date.now()}`;
+
+    // Add waypoint immediately with temporary name
     const newWaypoint: Waypoint = {
-      id: `waypoint-${Date.now()}`,
+      id,
       lng,
       lat,
-      name: undefined, // Will be populated by geocoding
+      name: '...',
     };
     setWaypoints((prev) => [...prev, newWaypoint]);
+
+    // Fetch the actual location name
+    try {
+      const locationName = await reverseGeocode(lng, lat);
+      setWaypoints((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, name: locationName } : w))
+      );
+    } catch (error) {
+      console.error('Failed to geocode location:', error);
+      // Update with fallback name
+      setWaypoints((prev) =>
+        prev.map((w) =>
+          w.id === id
+            ? { ...w, name: `Location at ${lat.toFixed(2)}, ${lng.toFixed(2)}` }
+            : w
+        )
+      );
+    }
   }, []);
 
   const removeWaypoint = useCallback((id: string) => {
