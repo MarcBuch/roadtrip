@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef } from 'react';
 import { Waypoint } from '@/types/travel';
 import { X, MapPin } from 'lucide-react';
 
@@ -7,13 +8,45 @@ interface WaypointListProps {
   waypoints: Waypoint[];
   onRemove: (id: string) => void;
   onClear: () => void;
+  onUpdateName: (id: string, name: string) => void;
 }
 
 export function WaypointList({
   waypoints,
   onRemove,
   onClear,
+  onUpdateName,
 }: WaypointListProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleStartEdit = (waypoint: Waypoint) => {
+    setEditingId(waypoint.id);
+    setEditValue(waypoint.name || '');
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (editValue.trim()) {
+      onUpdateName(id, editValue.trim());
+    }
+    setEditingId(null);
+    setEditValue('');
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditValue('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit(id);
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    }
+  };
   if (waypoints.length === 0) {
     return (
       <div className="p-4 text-gray-500 text-sm">
@@ -47,9 +80,24 @@ export function WaypointList({
                   {index + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
-                    {waypoint.name || 'Unnamed'}
-                  </p>
+                  {editingId === waypoint.id ? (
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => handleSaveEdit(waypoint.id)}
+                      onKeyDown={(e) => handleKeyDown(e, waypoint.id)}
+                      className="w-full px-2 py-1 text-sm border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  ) : (
+                    <p
+                      onClick={() => handleStartEdit(waypoint)}
+                      className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                    >
+                      {waypoint.name || 'Unnamed'}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500 mt-1">
                     {waypoint.lat.toFixed(4)}, {waypoint.lng.toFixed(4)}
                   </p>

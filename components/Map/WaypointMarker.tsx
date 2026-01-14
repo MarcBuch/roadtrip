@@ -8,15 +8,28 @@ interface WaypointMarkerProps {
   waypoint: Waypoint;
   index: number;
   onRemove: (id: string) => void;
+  onDragStart?: () => void;
+  onUpdatePosition?: (id: string, lat: number, lng: number) => void;
 }
 
 export function WaypointMarker({
   waypoint,
   index,
   onRemove,
+  onDragStart,
+  onUpdatePosition,
 }: WaypointMarkerProps) {
   return (
-    <Marker longitude={waypoint.lng} latitude={waypoint.lat} anchor="bottom">
+    <Marker
+      longitude={waypoint.lng}
+      latitude={waypoint.lat}
+      anchor="bottom"
+      draggable={true}
+      onDragStart={onDragStart}
+      onDragEnd={(e) => {
+        onUpdatePosition?.(waypoint.id, e.lngLat.lat, e.lngLat.lng);
+      }}
+    >
       <div className="relative group">
         <div className="flex flex-col items-center">
           <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold shadow-lg">

@@ -7,10 +7,23 @@ import { useRoute } from '@/hooks/useRoute';
 import { useCostSettings } from '@/hooks/useCostSettings';
 
 export default function Home() {
-  const { waypoints, addWaypoint, removeWaypoint, clearWaypoints } =
-    useWaypoints();
+  const {
+    waypoints,
+    addWaypoint,
+    removeWaypoint,
+    clearWaypoints,
+    updateWaypoint,
+  } = useWaypoints();
   const { route, loading } = useRoute(waypoints);
   const { settings, updateMpg, updatePrice } = useCostSettings();
+
+  const handleUpdateWaypoint = (id: string, lat: number, lng: number) => {
+    updateWaypoint(id, { lat, lng });
+  };
+
+  const handleUpdateWaypointName = (id: string, name: string) => {
+    updateWaypoint(id, { name });
+  };
 
   return (
     <main className="h-screen w-screen relative">
@@ -19,15 +32,18 @@ export default function Home() {
         route={route}
         onMapClick={addWaypoint}
         onRemoveWaypoint={removeWaypoint}
+        onUpdateWaypoint={handleUpdateWaypoint}
       />
 
       <ControlPanel
         route={route}
         settings={settings}
-        waypointCount={waypoints.length}
+        waypoints={waypoints}
         onUpdateMpg={updateMpg}
         onUpdatePrice={updatePrice}
-        onClearRoute={clearWaypoints}
+        onRemoveWaypoint={removeWaypoint}
+        onClearWaypoints={clearWaypoints}
+        onUpdateWaypointName={handleUpdateWaypointName}
       />
 
       {loading && (

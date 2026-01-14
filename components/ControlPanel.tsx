@@ -2,33 +2,38 @@
 
 import { CostDisplay } from './CostDisplay';
 import { SettingsPanel } from './SettingsPanel';
+import { WaypointList } from './WaypointList';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
-import { RouteData, CostSettings } from '@/types/travel';
+import { RouteData, CostSettings, Waypoint } from '@/types/travel';
 
 interface ControlPanelProps {
   route: RouteData | null;
   settings: CostSettings;
-  waypointCount: number;
+  waypoints: Waypoint[];
   onUpdateMpg: (mpg: number) => void;
   onUpdatePrice: (price: number) => void;
-  onClearRoute: () => void;
+  onRemoveWaypoint: (id: string) => void;
+  onClearWaypoints: () => void;
+  onUpdateWaypointName: (id: string, name: string) => void;
 }
 
 export function ControlPanel({
   route,
   settings,
-  waypointCount,
+  waypoints,
   onUpdateMpg,
   onUpdatePrice,
-  onClearRoute,
+  onRemoveWaypoint,
+  onClearWaypoints,
+  onUpdateWaypointName,
 }: ControlPanelProps) {
   return (
-    <div className="absolute top-4 right-4 space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+    <div className="absolute top-4 right-4 max-h-[calc(100vh-2rem)] overflow-y-auto space-y-4 flex flex-col">
       <CostDisplay
         route={route}
         settings={settings}
-        waypointCount={waypointCount}
+        waypointCount={waypoints.length}
       />
 
       <SettingsPanel
@@ -37,12 +42,14 @@ export function ControlPanel({
         onUpdatePrice={onUpdatePrice}
       />
 
-      {waypointCount > 0 && (
-        <Button onClick={onClearRoute} variant="destructive" className="w-full">
-          <Trash2 size={16} className="mr-2" />
-          Clear All Waypoints
-        </Button>
-      )}
+      <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col max-h-[calc(100vh-400px)]">
+        <WaypointList
+          waypoints={waypoints}
+          onRemove={onRemoveWaypoint}
+          onClear={onClearWaypoints}
+          onUpdateName={onUpdateWaypointName}
+        />
+      </div>
     </div>
   );
 }

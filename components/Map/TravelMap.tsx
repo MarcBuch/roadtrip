@@ -27,6 +27,7 @@ interface TravelMapProps {
   route?: RouteData | null;
   onMapClick: (lng: number, lat: number) => void;
   onRemoveWaypoint?: (id: string) => void;
+  onUpdateWaypoint?: (id: string, lat: number, lng: number) => void;
 }
 
 export function TravelMap({
@@ -34,8 +35,10 @@ export function TravelMap({
   route = null,
   onMapClick,
   onRemoveWaypoint,
+  onUpdateWaypoint,
 }: TravelMapProps) {
   const mapRef = useRef<MapRef>(null);
+  const isDraggingMarker = useRef(false);
   const [viewState, setViewState] = useState({
     longitude: -109.5, // Center of US
     latitude: 38.5,
@@ -44,10 +47,30 @@ export function TravelMap({
 
   const handleMapClick = useCallback(
     (event: MapMouseEvent) => {
+      // Ignore clicks that happen right after dragging a marker
+      if (isDraggingMarker.current) {
+        isDraggingMarker.current = false;
+        return;
+      }
       const { lng, lat } = event.lngLat;
       onMapClick(lng, lat);
     },
     [onMapClick]
+  );
+
+  const handleMarkerDragStart = useCallback(() => {
+    isDraggingMarker.current = true;
+  }, []);
+
+  const handleMarkerDragEnd = useCallback(
+    (id: string, lat: number, lng: number) => {
+      onUpdateWaypoint?.(id, lat, lng);
+      // Keep isDraggingMarker true to prevent the click event
+      setTimeout(() => {
+        isDraggingMarker.current = false;
+      }, 100);
+    },
+    [onUpdateWaypoint]
   );
 
   const handleRemoveWaypoint = useCallback(
@@ -96,7 +119,7 @@ export function TravelMap({
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
         onClick={handleMapClick}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapStyle="mapbox://styles/mapbox/standard"
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
       >
         {/* Route line */}
@@ -113,6 +136,8 @@ export function TravelMap({
             waypoint={waypoint}
             index={index}
             onRemove={handleRemoveWaypoint}
+            onDragStart={handleMarkerDragStart}
+            onUpdatePosition={handleMarkerDragEnd}
           />
         ))}
       </Map>
