@@ -2,10 +2,13 @@
 
 import { TravelMap } from '@/components/Map/TravelMap';
 import { ControlPanel } from '@/components/ControlPanel';
+import { SearchPanel } from '@/components/SearchPanel';
 import { useWaypoints } from '@/hooks/useWaypoints';
 import { useRoute } from '@/hooks/useRoute';
 import { useCostSettings } from '@/hooks/useCostSettings';
 import { reverseGeocode } from '@/lib/geocoding';
+import { SearchResult } from '@/lib/mapboxSearch';
+import { useState } from 'react';
 
 export default function Home() {
   const {
@@ -17,6 +20,9 @@ export default function Home() {
   } = useWaypoints();
   const { route, loading } = useRoute(waypoints);
   const { settings, updateMpg, updatePrice } = useCostSettings();
+  const [mapCenter, setMapCenter] = useState<
+    { lng: number; lat: number } | undefined
+  >();
 
   const handleUpdateWaypoint = async (id: string, lat: number, lng: number) => {
     // Update position immediately
@@ -38,6 +44,13 @@ export default function Home() {
     updateWaypoint(id, { name });
   };
 
+  const handleLocationSelect = async (result: SearchResult) => {
+    console.log('handleLocationSelect called with:', result);
+    const { longitude, latitude } = result.coordinates;
+    console.log('Adding waypoint at:', { lng: longitude, lat: latitude });
+    await addWaypoint(longitude, latitude);
+  };
+
   return (
     <main className="h-screen w-screen relative">
       <TravelMap
@@ -47,6 +60,13 @@ export default function Home() {
         onRemoveWaypoint={removeWaypoint}
         onUpdateWaypoint={handleUpdateWaypoint}
       />
+
+      <div className="absolute top-4 left-4 z-40">
+        <SearchPanel
+          onLocationSelect={handleLocationSelect}
+          proximityCenter={mapCenter}
+        />
+      </div>
 
       <ControlPanel
         route={route}
