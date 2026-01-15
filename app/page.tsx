@@ -6,8 +6,7 @@ import { SearchPanel } from '@/components/SearchPanel';
 import { useWaypoints } from '@/hooks/useWaypoints';
 import { useRoute } from '@/hooks/useRoute';
 import { useCostSettings } from '@/hooks/useCostSettings';
-import { reverseGeocode } from '@/lib/geocoding';
-import { SearchResult } from '@/lib/mapboxSearch';
+import { SearchResult, searchBoxReverseGeocode } from '@/lib/mapboxSearch';
 import { useState } from 'react';
 
 export default function Home() {
@@ -30,7 +29,7 @@ export default function Home() {
 
     // Fetch new location name
     try {
-      const locationName = await reverseGeocode(lng, lat);
+      const locationName = await searchBoxReverseGeocode(lng, lat);
       updateWaypoint(id, { name: locationName });
     } catch (error) {
       console.error('Failed to geocode location:', error);

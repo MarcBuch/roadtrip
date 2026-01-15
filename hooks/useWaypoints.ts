@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Waypoint } from '@/types/travel';
-import { reverseGeocode } from '@/lib/geocoding';
+import { searchBoxReverseGeocode } from '@/lib/mapboxSearch';
 
 export function useWaypoints() {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
@@ -21,7 +21,7 @@ export function useWaypoints() {
 
     // Fetch the actual location name
     try {
-      const locationName = await reverseGeocode(lng, lat);
+      const locationName = await searchBoxReverseGeocode(lng, lat);
       setWaypoints((prev) =>
         prev.map((w) => (w.id === id ? { ...w, name: locationName } : w))
       );

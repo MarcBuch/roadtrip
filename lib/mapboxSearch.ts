@@ -196,3 +196,148 @@ export function generateSessionToken(): string {
     return v.toString(16);
   });
 }
+
+/**
+ * Enhanced reverse lookup returning full location details
+ * Useful for displaying rich information about waypoints
+ */
+export interface ReverseGeocodeResult {
+  name: string;
+  address?: string;
+  fullAddress?: string;
+  placeFormatted?: string;
+  featureType: string;
+  category?: string[];
+  brand?: string[];
+  maki?: string;
+  context: {
+    country?: string;
+    region?: string;
+    place?: string;
+    neighborhood?: string;
+  };
+}
+
+/**
+ * Reverse lookup using Search Box API
+ * Returns the closest named location (POI, address, or place)
+ *
+ * @param lng Longitude
+ * @param lat Latitude
+ * @param options Optional configuration
+ * @returns Location name or coordinate fallback
+ */
+export async function searchBoxReverseGeocode(
+  lng: number,
+  lat: number,
+  options?: {
+    types?: string; // Feature type filter
+    language?: string;
+    limit?: number;
+    country?: string;
+  }
+): Promise<string> {
+  const accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+  if (!accessToken) {
+    console.error('Mapbox access token not found');
+    return `Waypoint (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      access_token: accessToken,
+      longitude: lng.toString(),
+      latitude: lat.toString(),
+      limit: (options?.limit ?? 1).toString(),
+      ...(options?.types && { types: options.types }),
+      ...(options?.language && { language: options.language }),
+      ...(options?.country && { country: options.country }),
+    });
+
+    const url = `https://api.mapbox.com/search/searchbox/v1/reverse?${params}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Search Box reverse geocoding failed: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (data.features && data.features.length > 0) {
+      const feature = data.features[0];
+      const props = feature.properties;
+
+      // Prefer city/place name, then POI name, then coordinates
+      const cityName = props.context?.place?.name;
+      if (cityName) return cityName;
+      
+      if (props.name) return props.name;
+      
+      return `Location at ${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+    }
+
+    return `Location at ${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+  } catch (error) {
+    console.error('Error during Search Box reverse geocoding:', error);
+    return `Waypoint (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+  }
+}
+
+/**
+ * Enhanced reverse lookup returning full location details
+ * @param lng Longitude
+ * @param lat Latitude
+ * @returns Full location details or null on error
+ */
+export async function searchBoxReverseGeocodeDetailed(
+  lng: number,
+  lat: number
+): Promise<ReverseGeocodeResult | null> {
+  const accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+  if (!accessToken) return null;
+
+  try {
+    const params = new URLSearchParams({
+      access_token: accessToken,
+      longitude: lng.toString(),
+      latitude: lat.toString(),
+      limit: '1',
+    });
+
+    const url = `https://api.mapbox.com/search/searchbox/v1/reverse?${params}`;
+    const response = await fetch(url);
+
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+
+    const data = await response.json();
+
+    if (!data.features?.length) return null;
+
+    const feature = data.features[0];
+    const props = feature.properties;
+
+    return {
+      name: props.name || props.full_address || '',
+      address: props.address,
+      fullAddress: props.full_address,
+      placeFormatted: props.place_formatted,
+      featureType: props.feature_type,
+      category: props.poi_category,
+      brand: props.brand,
+      maki: props.maki,
+      context: {
+        country: props.context?.country?.name,
+        region: props.context?.region?.name,
+        place: props.context?.place?.name,
+        neighborhood: props.context?.neighborhood?.name,
+      },
+    };
+  } catch (error) {
+    console.error('Error during detailed reverse geocoding:', error);
+    return null;
+  }
+}
