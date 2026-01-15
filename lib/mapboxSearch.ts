@@ -48,8 +48,8 @@ export async function getSuggestions(
       access_token: accessToken,
       session_token: sessionToken,
       limit: String(options?.limit || 5),
-      // Prioritize place results over POIs to ensure cities/towns come first
-      types: 'place,region,postcode,address,poi',
+      // Only return geographic places, not points of interest
+      types: 'place,region,postcode,address',
     });
 
     if (options?.proximity) {
@@ -87,7 +87,6 @@ export async function getSuggestions(
       region: 1,
       postcode: 2,
       address: 3,
-      poi: 4,
     };
 
     const sortedSuggestions = rawSuggestions
