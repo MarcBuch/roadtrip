@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Map, { Source, Layer } from 'react-map-gl/mapbox';
-import type { MapMouseEvent, MapRef, LineLayer } from 'react-map-gl/mapbox';
+import type { MapMouseEvent, MapRef } from 'react-map-gl/mapbox';
+import type { LineLayer } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { WaypointMarker } from './WaypointMarker';
 import { Waypoint, RouteData } from '@/types/travel';

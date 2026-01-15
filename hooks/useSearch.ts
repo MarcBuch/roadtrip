@@ -20,7 +20,7 @@ export function useSearch(options: UseSearchOptions = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sessionTokenRef = useRef<string>(generateSessionToken());
-  const debounceTimerRef = useRef<NodeJS.Timeout>();
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const debounceMs = options.debounceMs || 300;
 

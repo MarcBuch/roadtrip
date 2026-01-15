@@ -1,3 +1,5 @@
+import type { LineString } from 'geojson';
+
 export interface Waypoint {
   id: string;
   lng: number;
@@ -8,10 +10,7 @@ export interface Waypoint {
 export interface RouteData {
   distance: number; // in meters
   duration: number; // in seconds
-  geometry: {
-    type: string;
-    coordinates: [number, number][];
-  };
+  geometry: LineString;
 }
 
 export interface CostSettings {

@@ -90,18 +90,18 @@ export async function getSuggestions(
     };
 
     const sortedSuggestions = rawSuggestions
-      .map((suggestion) => ({
+      .map((suggestion: typeof rawSuggestions[0]) => ({
         ...suggestion,
         priority:
           typePriority[suggestion.featureType || ''] ?? Number.MAX_SAFE_INTEGER,
       }))
-      .sort((a, b) => {
+      .sort((a: typeof rawSuggestions[0] & { priority: number }, b: typeof rawSuggestions[0] & { priority: number }) => {
         if (a.priority === b.priority) {
           return a.originalIndex - b.originalIndex;
         }
         return a.priority - b.priority;
       })
-      .map(({ originalIndex, priority, ...rest }) => rest);
+      .map(({ originalIndex, priority, ...rest }: typeof rawSuggestions[0] & { priority: number }) => rest);
 
     return sortedSuggestions;
   } catch (error) {
