@@ -55,11 +55,16 @@ export function useWaypoints() {
     []
   );
 
+  const setWaypointsFromRoute = useCallback((loadedWaypoints: Waypoint[]) => {
+    setWaypoints(loadedWaypoints);
+  }, []);
+
   return {
     waypoints,
     addWaypoint,
     removeWaypoint,
     clearWaypoints,
     updateWaypoint,
+    setWaypointsFromRoute,
   };
 }
