@@ -83,8 +83,8 @@ export default function Home() {
           .sort((a, b) => a.position - b.position)
           .map((wp) => ({
             id: wp.id,
-            lng: wp.longitude,
-            lat: wp.latitude,
+            lng: parseFloat(wp.longitude),
+            lat: parseFloat(wp.latitude),
             name: wp.name || undefined,
           }));
 

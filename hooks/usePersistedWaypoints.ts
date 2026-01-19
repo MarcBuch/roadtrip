@@ -12,9 +12,9 @@ interface PersistenceOptions {
 
 interface RouteWaypoint {
   id: string;
-  latitude: number;
-  longitude: number;
-  name?: string;
+  latitude: string;
+  longitude: string;
+  name: string | null;
   position: number;
 }
 
@@ -31,13 +31,17 @@ export function usePersistedWaypoints(options: PersistenceOptions = {}) {
         setLoading(true);
         try {
           const route = await api.routes.get.query({ id: routeId });
-          const localWaypoints: Waypoint[] = (route.waypoints as RouteWaypoint[])
-            .sort((a: RouteWaypoint, b: RouteWaypoint) => a.position - b.position)
+          const localWaypoints: Waypoint[] = (
+            route.waypoints as RouteWaypoint[]
+          )
+            .sort(
+              (a: RouteWaypoint, b: RouteWaypoint) => a.position - b.position
+            )
             .map((wp: RouteWaypoint) => ({
               id: wp.id,
-              lng: wp.longitude,
-              lat: wp.latitude,
-              name: wp.name,
+              lng: parseFloat(wp.longitude),
+              lat: parseFloat(wp.latitude),
+              name: wp.name || undefined,
             }));
           setWaypoints(localWaypoints);
         } catch (error) {
@@ -65,9 +69,7 @@ export function usePersistedWaypoints(options: PersistenceOptions = {}) {
       try {
         const locationName = await searchBoxReverseGeocode(lng, lat);
         setWaypoints((prev) =>
-          prev.map((w) =>
-            w.id === id ? { ...w, name: locationName } : w
-          )
+          prev.map((w) => (w.id === id ? { ...w, name: locationName } : w))
         );
       } catch (error) {
         console.error('Failed to geocode location:', error);

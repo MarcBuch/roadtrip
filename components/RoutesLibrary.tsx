@@ -4,11 +4,21 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/trpc/client';
 import { Button } from '@/components/ui/button';
 import { Trash2, Map } from 'lucide-react';
+import type { Route as DbRoute } from '@/lib/db/schema';
 
-interface Route {
-  id: string;
-  name: string;
-  waypoints?: { length: number }[] | null;
+interface RouteWithWaypoints extends Omit<
+  DbRoute,
+  'created_at' | 'updated_at'
+> {
+  created_at: string | Date;
+  updated_at: string | Date;
+  waypoints?: Array<{
+    id: string;
+    latitude: string;
+    longitude: string;
+    name: string | null;
+    position: number;
+  }>;
 }
 
 interface RoutesLibraryProps {
@@ -16,7 +26,7 @@ interface RoutesLibraryProps {
 }
 
 export function RoutesLibrary({ onLoadRoute }: RoutesLibraryProps) {
-  const [routes, setRoutes] = useState<Route[]>([]);
+  const [routes, setRoutes] = useState<RouteWithWaypoints[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

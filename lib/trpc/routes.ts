@@ -1,6 +1,7 @@
 import { router, publicProcedure, protectedProcedure } from '@/lib/trpc/init';
 import { z } from 'zod';
-import { supabaseServer as supabase } from '@/lib/supabase/server';
+import * as routeRepository from '@/lib/db/repositories/routes';
+import * as waypointRepository from '@/lib/db/repositories/waypoints';
 
 const WaypointSchema = z.object({
   id: z.string(),
@@ -27,92 +28,65 @@ export const routeRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { data: route, error: routeError } = await supabase
-        .from('routes')
-        .insert({
-          name: input.name,
-          description: input.description,
-          user_id: ctx.userId,
-        })
-        .select()
-        .single();
+      const route = await routeRepository.createRoute(ctx.userId, {
+        name: input.name,
+        description: input.description,
+      });
 
-      if (routeError) throw routeError;
+      if (input.waypoints.length > 0) {
+        const waypointsData = input.waypoints.map((wp, index) => ({
+          route_id: route.id,
+          latitude: wp.latitude.toString(),
+          longitude: wp.longitude.toString(),
+          name: wp.name,
+          position: index,
+        }));
 
-      const waypointsData = input.waypoints.map((wp, index) => ({
-        route_id: route.id,
-        latitude: wp.latitude,
-        longitude: wp.longitude,
-        name: wp.name,
-        position: index,
-      }));
-
-      const { error: waypointsError } = await supabase
-        .from('waypoints')
-        .insert(waypointsData);
-
-      if (waypointsError) throw waypointsError;
+        await waypointRepository.createWaypoints(waypointsData);
+      }
 
       return route;
     }),
 
   // Get all routes (user's routes if authenticated, public if not)
   list: publicProcedure.query(async ({ ctx }) => {
-    let query = supabase.from('routes').select(
-      `
-        *,
-        waypoints:waypoints(
-          id,
-          latitude,
-          longitude,
-          name,
-          position
-        )
-      `
-    );
-
-    // If user is signed in, get their routes; otherwise get public routes
-    if (ctx.userId) {
-      query = query.eq('user_id', ctx.userId);
+    if (!ctx.userId) {
+      return [];
     }
 
-    const { data, error } = await query.order('created_at', {
-      ascending: false,
-    });
+    const routes = await routeRepository.getRoutesByUserId(ctx.userId);
 
-    if (error) throw error;
-    return data;
+    // Fetch waypoints for each route
+    const routesWithWaypoints = await Promise.all(
+      routes.map(async (route) => {
+        const waypoints = await waypointRepository.getWaypointsByRouteId(
+          route.id
+        );
+        return { ...route, waypoints };
+      })
+    );
+
+    return routesWithWaypoints;
   }),
 
   // Get a specific route
   get: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ input, ctx }) => {
-      let query = supabase
-        .from('routes')
-        .select(
-          `
-          *,
-          waypoints:waypoints(
-            id,
-            latitude,
-            longitude,
-            name,
-            position
-          )
-        `
-        )
-        .eq('id', input.id);
-
-      // If user is signed in, restrict to their routes; otherwise allow public
-      if (ctx.userId) {
-        query = query.eq('user_id', ctx.userId);
+      if (!ctx.userId) {
+        throw new Error('Unauthorized');
       }
 
-      const { data, error } = await query.single();
+      const route = await routeRepository.getRouteWithWaypoints(
+        input.id,
+        ctx.userId
+      );
 
-      if (error) throw error;
-      return data;
+      if (!route) {
+        throw new Error('Route not found');
+      }
+
+      return route;
     }),
 
   // Update a route
@@ -136,55 +110,29 @@ export const routeRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { id, name, description, waypoints } = input;
 
-      // Verify ownership of the route
-      const { data: existingRoute } = await supabase
-        .from('routes')
-        .select('user_id')
-        .eq('id', id)
-        .single();
-
-      if (!existingRoute || existingRoute.user_id !== ctx.userId) {
-        throw new Error('Unauthorized: You can only update your own routes');
-      }
-
       // Update route metadata
-      if (name || description) {
-        const { error: updateError } = await supabase
-          .from('routes')
-          .update({
-            ...(name && { name }),
-            ...(description && { description }),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', id);
+      if (name !== undefined || description !== undefined) {
+        const updated = await routeRepository.updateRoute(id, ctx.userId, {
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+        });
 
-        if (updateError) throw updateError;
+        if (!updated) {
+          throw new Error('Unauthorized: You can only update your own routes');
+        }
       }
 
       // Update waypoints if provided
       if (waypoints) {
-        // Delete existing waypoints
-        const { error: deleteError } = await supabase
-          .from('waypoints')
-          .delete()
-          .eq('route_id', id);
-
-        if (deleteError) throw deleteError;
-
-        // Insert new waypoints
         const waypointsData = waypoints.map((wp, index) => ({
           route_id: id,
-          latitude: wp.latitude,
-          longitude: wp.longitude,
+          latitude: wp.latitude.toString(),
+          longitude: wp.longitude.toString(),
           name: wp.name,
           position: index,
         }));
 
-        const { error: insertError } = await supabase
-          .from('waypoints')
-          .insert(waypointsData);
-
-        if (insertError) throw insertError;
+        await waypointRepository.replaceWaypoints(id, waypointsData);
       }
 
       return { success: true };
@@ -194,23 +142,12 @@ export const routeRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
-      // Verify ownership of the route
-      const { data: existingRoute } = await supabase
-        .from('routes')
-        .select('user_id')
-        .eq('id', id)
-        .single();
+      const deleted = await routeRepository.deleteRoute(input.id, ctx.userId);
 
-      if (!existingRoute || existingRoute.user_id !== ctx.userId) {
+      if (!deleted) {
         throw new Error('Unauthorized: You can only delete your own routes');
       }
 
-      const { error } = await supabase
-        .from('routes')
-        .delete()
-        .eq('id', input.id);
-
-      if (error) throw error;
       return { success: true };
     }),
 
@@ -226,75 +163,47 @@ export const routeRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       // Verify ownership of the route
-      const { data: existingRoute } = await supabase
-        .from('routes')
-        .select('user_id')
-        .eq('id', input.routeId)
-        .single();
+      const route = await routeRepository.getRouteWithWaypoints(
+        input.routeId,
+        ctx.userId
+      );
 
-      if (!existingRoute || existingRoute.user_id !== ctx.userId) {
+      if (!route) {
         throw new Error(
           'Unauthorized: You can only add waypoints to your own routes'
         );
       }
 
-      // Get the highest position number
-      const { data: maxPosition } = await supabase
-        .from('waypoints')
-        .select('position')
-        .eq('route_id', input.routeId)
-        .order('position', { ascending: false })
-        .limit(1);
+      // Get current waypoints to determine next position
+      const existingWaypoints = await waypointRepository.getWaypointsByRouteId(
+        input.routeId
+      );
+      const nextPosition =
+        existingWaypoints.length > 0
+          ? Math.max(...existingWaypoints.map((w) => w.position)) + 1
+          : 0;
 
-      const nextPosition = (maxPosition?.[0]?.position ?? -1) + 1;
+      const waypoint = await waypointRepository.createWaypoint({
+        route_id: input.routeId,
+        latitude: input.latitude.toString(),
+        longitude: input.longitude.toString(),
+        name: input.name,
+        position: nextPosition,
+      });
 
-      const { data, error } = await supabase
-        .from('waypoints')
-        .insert({
-          route_id: input.routeId,
-          latitude: input.latitude,
-          longitude: input.longitude,
-          name: input.name,
-          position: nextPosition,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      return waypoint;
     }),
 
   // Remove a waypoint
   removeWaypoint: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
-      // Verify ownership: get the waypoint's route and check user_id
-      const { data: waypoint } = await supabase
-        .from('waypoints')
-        .select('route_id')
-        .eq('id', input.id)
-        .single();
+      const deleted = await waypointRepository.deleteWaypoint(input.id);
 
-      if (waypoint) {
-        const { data: route } = await supabase
-          .from('routes')
-          .select('user_id')
-          .eq('id', waypoint.route_id)
-          .single();
-
-        if (!route || route.user_id !== ctx.userId) {
-          throw new Error(
-            'Unauthorized: You can only remove waypoints from your own routes'
-          );
-        }
+      if (!deleted) {
+        throw new Error('Waypoint not found');
       }
 
-      const { error } = await supabase
-        .from('waypoints')
-        .delete()
-        .eq('id', input.id);
-
-      if (error) throw error;
       return { success: true };
     }),
 });

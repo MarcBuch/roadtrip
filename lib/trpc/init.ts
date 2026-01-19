@@ -11,7 +11,7 @@ export async function createContext(): Promise<Context> {
   const headersList = await headers();
   const auth = getAuth({ headers: headersList } as any);
   return {
-    userId: auth.userId,
+    userId: auth.userId ?? undefined,
     auth,
   };
 }
