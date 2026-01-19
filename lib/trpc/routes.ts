@@ -1,4 +1,4 @@
-import { router, publicProcedure } from '@/lib/trpc/init';
+import { router, publicProcedure, protectedProcedure } from '@/lib/trpc/init';
 import { z } from 'zod';
 import { supabaseServer as supabase } from '@/lib/supabase/server';
 
@@ -12,7 +12,7 @@ const WaypointSchema = z.object({
 
 export const routeRouter = router({
   // Create a new route with waypoints
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -26,13 +26,13 @@ export const routeRouter = router({
         ),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { data: route, error: routeError } = await supabase
         .from('routes')
         .insert({
           name: input.name,
           description: input.description,
-          user_id: null,
+          user_id: ctx.userId,
         })
         .select()
         .single();
@@ -56,12 +56,10 @@ export const routeRouter = router({
       return route;
     }),
 
-  // Get all routes (public and user's routes if authenticated)
-  list: publicProcedure.query(async () => {
-    const { data, error } = await supabase
-      .from('routes')
-      .select(
-        `
+  // Get all routes (user's routes if authenticated, public if not)
+  list: publicProcedure.query(async ({ ctx }) => {
+    let query = supabase.from('routes').select(
+      `
         *,
         waypoints:waypoints(
           id,
@@ -71,8 +69,16 @@ export const routeRouter = router({
           position
         )
       `
-      )
-      .order('created_at', { ascending: false });
+    );
+
+    // If user is signed in, get their routes; otherwise get public routes
+    if (ctx.userId) {
+      query = query.eq('user_id', ctx.userId);
+    }
+
+    const { data, error } = await query.order('created_at', {
+      ascending: false,
+    });
 
     if (error) throw error;
     return data;
@@ -81,8 +87,8 @@ export const routeRouter = router({
   // Get a specific route
   get: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input }) => {
-      const { data, error } = await supabase
+    .query(async ({ input, ctx }) => {
+      let query = supabase
         .from('routes')
         .select(
           `
@@ -96,15 +102,21 @@ export const routeRouter = router({
           )
         `
         )
-        .eq('id', input.id)
-        .single();
+        .eq('id', input.id);
+
+      // If user is signed in, restrict to their routes; otherwise allow public
+      if (ctx.userId) {
+        query = query.eq('user_id', ctx.userId);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) throw error;
       return data;
     }),
 
   // Update a route
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -121,8 +133,19 @@ export const routeRouter = router({
           .optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, name, description, waypoints } = input;
+
+      // Verify ownership of the route
+      const { data: existingRoute } = await supabase
+        .from('routes')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (!existingRoute || existingRoute.user_id !== ctx.userId) {
+        throw new Error('Unauthorized: You can only update your own routes');
+      }
 
       // Update route metadata
       if (name || description) {
@@ -168,9 +191,20 @@ export const routeRouter = router({
     }),
 
   // Delete a route
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Verify ownership of the route
+      const { data: existingRoute } = await supabase
+        .from('routes')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (!existingRoute || existingRoute.user_id !== ctx.userId) {
+        throw new Error('Unauthorized: You can only delete your own routes');
+      }
+
       const { error } = await supabase
         .from('routes')
         .delete()
@@ -181,7 +215,7 @@ export const routeRouter = router({
     }),
 
   // Add a waypoint to an existing route
-  addWaypoint: publicProcedure
+  addWaypoint: protectedProcedure
     .input(
       z.object({
         routeId: z.string().uuid(),
@@ -190,7 +224,20 @@ export const routeRouter = router({
         name: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Verify ownership of the route
+      const { data: existingRoute } = await supabase
+        .from('routes')
+        .select('user_id')
+        .eq('id', input.routeId)
+        .single();
+
+      if (!existingRoute || existingRoute.user_id !== ctx.userId) {
+        throw new Error(
+          'Unauthorized: You can only add waypoints to your own routes'
+        );
+      }
+
       // Get the highest position number
       const { data: maxPosition } = await supabase
         .from('waypoints')
@@ -218,9 +265,30 @@ export const routeRouter = router({
     }),
 
   // Remove a waypoint
-  removeWaypoint: publicProcedure
+  removeWaypoint: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Verify ownership: get the waypoint's route and check user_id
+      const { data: waypoint } = await supabase
+        .from('waypoints')
+        .select('route_id')
+        .eq('id', input.id)
+        .single();
+
+      if (waypoint) {
+        const { data: route } = await supabase
+          .from('routes')
+          .select('user_id')
+          .eq('id', waypoint.route_id)
+          .single();
+
+        if (!route || route.user_id !== ctx.userId) {
+          throw new Error(
+            'Unauthorized: You can only remove waypoints from your own routes'
+          );
+        }
+      }
+
       const { error } = await supabase
         .from('waypoints')
         .delete()
