@@ -33,7 +33,7 @@ export function ControlPanel({
   onShowLibrary,
 }: ControlPanelProps) {
   return (
-    <div className="absolute top-4 right-4 max-h-[calc(100vh-2rem)] overflow-y-auto space-y-4 flex flex-col">
+    <div className="absolute top-20 right-4 max-h-[calc(100vh-6rem)] overflow-y-auto space-y-4 flex flex-col">
       <CostDisplay
         route={route}
         settings={settings}

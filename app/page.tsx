@@ -5,6 +5,7 @@ import { ControlPanel } from '@/components/ControlPanel';
 import { SearchPanel } from '@/components/SearchPanel';
 import { SaveRouteDialog } from '@/components/SaveRouteDialog';
 import { RoutesLibrary } from '@/components/RoutesLibrary';
+import { AuthHeader } from '@/components/AuthHeader';
 import { useWaypoints } from '@/hooks/useWaypoints';
 import { useRoute } from '@/hooks/useRoute';
 import { useCostSettings } from '@/hooks/useCostSettings';
@@ -76,7 +77,7 @@ export default function Home() {
     try {
       const { api } = await import('@/lib/trpc/client');
       const route = await api.routes.get.query({ id: routeId });
-      
+
       if (route.waypoints && route.waypoints.length > 0) {
         const loadedWaypoints = route.waypoints
           .sort((a, b) => a.position - b.position)
@@ -86,7 +87,7 @@ export default function Home() {
             lat: wp.latitude,
             name: wp.name || undefined,
           }));
-        
+
         setWaypointsFromRoute(loadedWaypoints);
         setShowLibrary(false);
       }
@@ -105,6 +106,8 @@ export default function Home() {
         onRemoveWaypoint={removeWaypoint}
         onUpdateWaypoint={handleUpdateWaypoint}
       />
+
+      <AuthHeader />
 
       <div className="absolute top-4 left-4 z-40">
         <SearchPanel

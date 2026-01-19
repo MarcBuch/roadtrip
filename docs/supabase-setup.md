@@ -78,7 +78,7 @@ CREATE POLICY "Users can manage waypoints in own routes"
   ON waypoints FOR ALL
   USING (
     route_id IN (
-      SELECT id FROM routes 
+      SELECT id FROM routes
       WHERE auth.uid() = user_id OR user_id IS NULL
     )
   );
